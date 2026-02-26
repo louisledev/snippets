@@ -72,15 +72,21 @@ $pools = Invoke-DevOpsApi `
 #    (Change $poolId to explore different pools)
 #####################################################################
 if ($pools.value) {
-    # Default: use the first self-hosted pool found
+    # Default: use the first self-hosted pool that has at least one agent
     $selfHosted = $pools.value | Where-Object { $_.isHosted -eq $false }
-    if ($selfHosted) {
-        $poolId = $selfHosted[0].id
-        Write-Host "`n  → Using pool: '$($selfHosted[0].name)' (ID: $poolId)" -ForegroundColor Magenta
-    } else {
-        $poolId = $pools.value[0].id
-        Write-Host "`n  → No self-hosted pool found, using first pool (ID: $poolId)" -ForegroundColor Yellow
+    $selectedPool = $selfHosted | Where-Object { $_.size -gt 0 } | Select-Object -First 1
+    if (-not $selectedPool) {
+        # Fall back to any self-hosted pool (even empty), then any pool with agents
+        $selectedPool = $selfHosted | Select-Object -First 1
     }
+    if (-not $selectedPool) {
+        $selectedPool = $pools.value | Where-Object { $_.size -gt 0 } | Select-Object -First 1
+    }
+    if (-not $selectedPool) {
+        $selectedPool = $pools.value[0]
+    }
+    $poolId = $selectedPool.id
+    Write-Host "`n  → Using pool: '$($selectedPool.name)' (ID: $poolId, agents: $($selectedPool.size))" -ForegroundColor Magenta
 } else {
     $poolId = 1  # fallback
 }
